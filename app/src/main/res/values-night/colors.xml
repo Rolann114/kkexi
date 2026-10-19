@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色模式下窗口的底色。与 Theme.kt 的 DarkColors.background 保持一致 -->
+    <color name="window_background">#FF101317</color>
+    <color name="splash_background">#FF123E66</color>
+</resources>

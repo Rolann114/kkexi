@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      深色模式下的主题。
+
+      为什么要单独一份：`Theme.Material.Light.NoActionBar` 在深色系统下仍然是浅色主题，
+      这样状态栏图标会是深色、而背景是深色 → 图标看不见。
+      换成 `Theme.Material.NoActionBar`（深色父主题）+ `windowLightStatusBar=false` 才对。
+    -->
+    <style name="Theme.Kkexi" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

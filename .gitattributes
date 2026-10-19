@@ -1,0 +1,18 @@
+# 强制 LF，避免 git 把行尾翻成 CRLF。
+# 为什么不能只靠 core.autocrlf：那是每台机器各自的配置，
+# 一旦有人 clone 时配置不同，git diff 就会变成"整文件都改了"
+# （历史上踩过一次整文件重写：785 行文档 + 1547 行样式表被整份重写）。
+# 仓库级强制才是可靠的。
+* text=auto eol=lf
+
+# 二进制文件不做行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.apk binary
+*.aab binary
+*.jar binary
+*.keystore binary
+*.jks binary
+*.zip binary

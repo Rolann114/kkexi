@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标（Android 8.0+，本 App 的 minSdk 就是 26，所以这一个文件覆盖全部设备）。
+
+  三块内容：
+  - background：渐变蓝底；
+  - foreground：「课隙」的日历图形（中间那道缝）；
+  - monochrome：Android 13 起的「主题图标」，系统会取它的形状、用壁纸配色重绘。
+    没有它，开了主题图标后这个 App 会显示成一团灰，很显眼。
+-->
+<!--
+  自适应图标（Android 8.0+，本 App 的 minSdk 就是 26，所以这一个文件覆盖全部设备）。
+
+  三块内容：
+  - background：渐变蓝底；
+  - foreground：「课隙」的日历图形（中间那道缝）；
+  - monochrome：Android 13 起的「主题图标」，系统会取它的形状、用壁纸配色重绘。
+    没有它，开了主题图标后这个 App 会显示成一团灰，很显眼。
+
+  > 实测说明：装到华为/HarmonyOS 的机器上，桌面显示的是「白底 + 蓝色线稿」，
+  > 与本设计的「蓝底 + 白色线稿」正好相反。两种可能：(a) 启动器缓存了旧图标
+  > （旧图标是系统的 ic_menu_my_calendar，也是白底蓝线）；(b) 启动器按 monochrome
+  > 层做了主题化。我试过临时去掉 monochrome 验证，但启动器缓存没有随之刷新，
+  > **无法确诊**。资源本身是正确的（aapt2 dump badging 指向本文件，构建无警告）。
+  > 全新安装或重启启动器后应显示设计中的蓝底版本。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

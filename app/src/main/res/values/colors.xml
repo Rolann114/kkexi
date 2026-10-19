@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      只定义「系统绘制、Compose 之前」会用到的那几个颜色。
+
+      为什么需要它们：Compose 的 KkexiTheme 管不到 Activity 冷启动那一瞬。
+      如果不管，深色模式下打开 App 会先闪一下白底（windowBackground 默认是白的），
+      看起来像卡了一下。这里给深色模式一个深色底，就没有那个闪白。
+
+      真正的界面配色在 Theme.kt 里，这里不要重复定义。
+    -->
+
+    <!-- 冷启动时窗口的底色。浅色模式 -->
+    <color name="window_background">#FFF7F8FA</color>
+
+    <!-- 启动画面底色（Android 12+）。与图标背景同色系，过渡最自然 -->
+    <color name="splash_background">#FF1B4B7A</color>
+</resources>

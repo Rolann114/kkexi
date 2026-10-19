@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  应用图标背景：对角渐变蓝。
+
+  为什么用矢量而不是 PNG：
+  - 一张图要出 mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi 五套，加起来几百 KB；
+    矢量只有一个文件、任意分辨率都清晰（AGENTS.md 硬约束 7「依赖克制」）。
+  - Android 8.0+ 的自适应图标本来就以「108×108dp 画布 + 中间 72dp 安全区」为坐标，
+    矢量表达这个最自然。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108"
+                android:type="linear">
+                <item android:offset="0" android:color="#FF3B7DD8" />
+                <item android:offset="1" android:color="#FF123E66" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

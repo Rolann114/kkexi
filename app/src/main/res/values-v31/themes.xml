@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ 的启动画面（Splash Screen API）。
+
+      不加这份的话，Android 12+ 会用「应用图标 + 主题默认底色」硬凑一个启动画面，
+      在深色/浅色模式下经常配色不搭。显式指定后：底色是图标背景那一族蓝，
+      中间的图标就是 App 自己的图标，冷启动到 Compose 首帧之间的过渡是连贯的。
+
+      这份是浅色模式，深色模式在 values-night-v31。
+    -->
+    <style name="Theme.Kkexi" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@color/window_background</item>
+
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <!-- 图标在启动画面上只显示约 2/3 大小，稍微放大一点视觉重量才够 -->
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+    </style>
+</resources>
