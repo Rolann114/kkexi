@@ -71,12 +71,15 @@
 - Gradle 9.6.0（或直接用 Android Studio 打开）
 
 ```bash
+git clone https://github.com/Rolann114/kkexi.git
+cd kkexi
 gradle assembleDebug
 # 产物：app/build/outputs/apk/debug/app-debug.apk
 ```
 
 仓库刻意不包含 SDK / JDK / Gradle 和签名文件；`keystore.properties` 不存在时
-debug 仍可正常构建。
+debug 仍可正常构建。目前没有预编译的 Release APK，需要自己构建：
+debug 包未做 R8 混淆，所以会比 release 大不少。
 
 ## 项目结构
 
