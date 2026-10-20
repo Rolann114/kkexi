@@ -50,6 +50,8 @@ PROJECT_STATE.md
 .dsh-write-probe.txt
 _p3.txt
 keystore/
+上传文件/
+_demo-build/
 
 # 编辑器
 .idea/

@@ -773,12 +773,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun importJson(text: String) {
-        val parsed = Backup.parse(text)
-        if (parsed.events.isEmpty() && parsed.errors.isNotEmpty()) {
-            toast("导入失败：${parsed.errors.first()}")
-            return
-        }
         viewModelScope.launch {
+            // 含原图的备份可能有几 MB；JSON + base64 解码必须离开主线程。
+            val parsed = withContext(Dispatchers.IO) { Backup.parse(text) }
+            if (parsed.events.isEmpty() && parsed.errors.isNotEmpty()) {
+                toast("导入失败：${parsed.errors.first()}")
+                return@launch
+            }
+            var restoredImages = 0
             withContext(Dispatchers.IO) {
                 // 设置：备份里带了的才覆盖，没带的保留当前值。
                 // 这样「导一份只有日程的老备份」不会把现有外观/作息冲掉。
@@ -792,15 +794,49 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 parsed.settings.courseLeadMinutes?.let { settings.courseLeadMinutes = it }
                 parsed.settings.eventLeadMinutes?.let { settings.eventLeadMinutes = it }
 
-                for (event in parsed.events) repository.upsert(event)
+                // v3：先把原图写回 App 私有目录，再把路径挂到事件上。
+                // 同一张图被多条事件引用时，saveImportedImage 按内容哈希去重，不会写多份。
+                val resolved = parsed.events.map { event ->
+                    val imageId = parsed.eventImageIds[event.id]
+                    val payload = imageId?.let { parsed.images[it] }
+                    val path = payload?.let { saveImportedImage(it) }
+                    if (path != null) restoredImages++
+                    if (path == null) event else event.copy(sourceImagePath = path)
+                }
+                for (event in resolved) repository.upsert(event)
                 for (exception in parsed.exceptions) repository.upsertException(exception)
                 Alarms.reschedule(getApplication())
             }
             refresh()
             val extra = if (parsed.errors.isEmpty()) "" else "，${parsed.errors.size} 条被跳过"
             val settingsNote = if (parsed.settings.isEmpty) "" else "，设置也一并恢复"
-            toast("已导入 ${parsed.events.size} 条$settingsNote$extra")
+            val imageNote = when {
+                restoredImages > 0 -> "，恢复 $restoredImages 张原图"
+                parsed.eventImageIds.isNotEmpty() -> "，原图写入失败"
+                else -> ""
+            }
+            toast("已导入 ${parsed.events.size} 条$settingsNote$imageNote$extra")
         }
+    }
+
+    /** 把备份里的原图写回 `filesDir/chat_images`；按内容哈希命名，重复导入不会越写越多。 */
+    private fun saveImportedImage(payload: Backup.ImagePayload): String? = try {
+        val app = getApplication<android.app.Application>()
+        val dir = java.io.File(app.filesDir, "chat_images")
+        if (!dir.exists()) dir.mkdirs()
+        val ext = when (payload.mime) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            "image/gif" -> "gif"
+            else -> "jpg"
+        }
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(payload.bytes)
+        val hash = digest.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+        val target = java.io.File(dir, "imported-$hash.$ext")
+        if (!target.exists()) target.writeBytes(payload.bytes)
+        target.absolutePath
+    } catch (_: Exception) {
+        null
     }
 
     // ---------------------------------------------------------------- AI

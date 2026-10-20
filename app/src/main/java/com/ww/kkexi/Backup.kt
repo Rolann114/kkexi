@@ -2,7 +2,9 @@ package com.ww.kkexi
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.time.LocalDate
+import java.util.Base64
 
 /**
  * JSON 导出/导入（Q4 = 纯本地 + 手动备份文件）。
@@ -16,10 +18,32 @@ import java.time.LocalDate
  * 而这会直接改变所有「按节次录入的课程」的实际时刻。
  *
  * 所以 v2 把设置也带上。导入端对 v1 文件是兼容的（没有 [SettingsSnapshot] 就只导日程）。
+ *
+ * ## v3 把「一手资料」也带上
+ * 用户 2026-10-20 反馈：「导出文件时无法同时导出图片，导入后一手信息就用不了了」。
+ * v2 之前只存了 `sourceImagePath`（本机绝对路径），导出时根本没写，换手机必然丢。
+ * v3 改为：
+ * - 事件里写 `sourceText`（原文）；
+ * - 原图按文件去重后放进顶层 `images`（base64），事件用 `sourceImageId` 引用；
+ * - 导入时由 `AppViewModel` 把图片写回 App 私有目录，再挂到事件上。
  */
 object Backup {
 
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
+
+    /** 单张原图上限；超过就不塞进备份，避免一份备份大到无法复制。 */
+    private const val MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+    /** 整份备份里原图总上限。 */
+    private const val MAX_TOTAL_IMAGE_BYTES = 40 * 1024 * 1024
+
+    /** 备份里的一张原图。 */
+    data class ImagePayload(
+        val id: String,
+        val mime: String,
+        val name: String,
+        val bytes: ByteArray,
+    )
 
     /**
      * 备份里的设置快照。
@@ -68,6 +92,36 @@ object Backup {
         }
 
         val eventArray = JSONArray()
+        // 原图按「绝对路径」去重：一张课表截图可能对应 18 条候选，
+        // 每条都内嵌一份 base64 会让备份膨胀十几倍。
+        val images = JSONArray()
+        val imageIdByPath = LinkedHashMap<String, String>()
+        var totalImageBytes = 0L
+
+        fun imageIdFor(path: String): String? {
+            if (path.isBlank()) return null
+            val file = File(path)
+            if (!file.isFile) return null
+            val key = file.absolutePath
+            imageIdByPath[key]?.let { return it }
+            val size = file.length()
+            if (size <= 0 || size > MAX_IMAGE_BYTES) return null
+            if (totalImageBytes + size > MAX_TOTAL_IMAGE_BYTES) return null
+            val bytes = runCatching { file.readBytes() }.getOrNull() ?: return null
+            val id = "img-" + (imageIdByPath.size + 1)
+            images.put(
+                JSONObject().apply {
+                    put("id", id)
+                    put("mime", mimeOf(path))
+                    put("name", file.name)
+                    put("data", Base64.getEncoder().encodeToString(bytes))
+                },
+            )
+            imageIdByPath[key] = id
+            totalImageBytes += size
+            return id
+        }
+
         for (event in events) {
             val item = JSONObject()
             item.put("id", event.id)
@@ -100,6 +154,9 @@ object Backup {
             item.put("remindMinutesBefore", event.remindMinutesBefore)
             item.put("reminderEnabled", event.reminderEnabled)
             item.put("source", event.source)
+            // v3：原文与「一手资料」原图。
+            item.put("sourceText", event.sourceText)
+            imageIdFor(event.sourceImagePath)?.let { item.put("sourceImageId", it) }
             event.recurrence?.let { rule ->
                 val rec = JSONObject()
                 rec.put("dayOfWeek", rule.dayOfWeek.value)
@@ -112,6 +169,7 @@ object Backup {
             eventArray.put(item)
         }
         root.put("events", eventArray)
+        if (images.length() > 0) root.put("images", images)
 
         val exceptionArray = JSONArray()
         for (exception in exceptions) {
@@ -146,6 +204,15 @@ object Backup {
         return root.toString(2)
     }
 
+    /** 根据扩展名给原图一个 MIME；App 里存的图基本都是 JPEG。 */
+    private fun mimeOf(path: String): String =
+        when (path.substringAfterLast('.', "").lowercase()) {
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            else -> "image/jpeg"
+        }
+
     /** 导入结果；[errors] 非空表示有行被跳过，界面必须把原文展示给用户。 */
     data class ImportResult(
         val events: List<Event>,
@@ -153,6 +220,10 @@ object Backup {
         val errors: List<String>,
         /** v2 起带设置；v1 文件这里是空的。 */
         val settings: SettingsSnapshot = SettingsSnapshot(),
+        /** v3 起带原图：id → 图片字节。 */
+        val images: Map<String, ImagePayload> = emptyMap(),
+        /** v3 起：eventId → 原图 id。由 AppViewModel 写回文件后再填 `sourceImagePath`。 */
+        val eventImageIds: Map<String, String> = emptyMap(),
     )
 
     fun parse(text: String): ImportResult {
@@ -191,7 +262,37 @@ object Backup {
             )
         } ?: SettingsSnapshot()
 
+        // v3：先把原图解码出来。坏图只跳过图，不影响事件本身。
+        val images = LinkedHashMap<String, ImagePayload>()
+        val imageArray = root.optJSONArray("images") ?: JSONArray()
+        for (index in 0 until imageArray.length()) {
+            val item = imageArray.optJSONObject(index) ?: continue
+            val id = item.text("id").ifEmpty { "img-${index + 1}" }
+            val data = item.text("data")
+            if (data.isEmpty()) {
+                errors += "第 ${index + 1} 张原图没有数据，已跳过"
+                continue
+            }
+            val bytes = try {
+                Base64.getDecoder().decode(data)
+            } catch (error: Exception) {
+                errors += "第 ${index + 1} 张原图解码失败，已跳过：${error.message}"
+                continue
+            }
+            if (bytes.size > MAX_IMAGE_BYTES) {
+                errors += "第 ${index + 1} 张原图超过 ${MAX_IMAGE_BYTES / 1024 / 1024} MB，已跳过"
+                continue
+            }
+            images[id] = ImagePayload(
+                id = id,
+                mime = item.text("mime").ifEmpty { "image/jpeg" },
+                name = item.text("name"),
+                bytes = bytes,
+            )
+        }
+
         val events = ArrayList<Event>()
+        val eventImageIds = LinkedHashMap<String, String>()
         val eventArray = root.optJSONArray("events") ?: JSONArray()
         for (index in 0 until eventArray.length()) {
             val item = eventArray.optJSONObject(index) ?: continue
@@ -223,8 +324,18 @@ object Backup {
                     else -> TimeSpec.ByPeriod(item.getInt("firstPeriod"), item.getInt("periodCount"))
                 }
 
+                val eventId = item.getString("id")
+                val sourceImageId = item.text("sourceImageId")
+                if (sourceImageId.isNotEmpty()) {
+                    if (images.containsKey(sourceImageId)) {
+                        eventImageIds[eventId] = sourceImageId
+                    } else {
+                        errors += "第 ${index + 1} 条事件引用的原图不存在，已跳过原图"
+                    }
+                }
+
                 events += Event(
-                    id = item.getString("id"),
+                    id = eventId,
                     title = item.getString("title"),
                     kind = EventKind.valueOf(item.getString("kind")),
                     // 老备份没有 category 键，留空字符串，界面会回退到 kind 的默认名。
@@ -239,6 +350,9 @@ object Backup {
                     remindMinutesBefore = item.optInt("remindMinutesBefore", 30),
                     reminderEnabled = item.optBoolean("reminderEnabled", true),
                     source = item.text("source").ifEmpty { "" },
+                    // v3：原文直接恢复；原图路径要先由 AppViewModel 写回文件，这里留空。
+                    sourceText = item.text("sourceText"),
+                    sourceImagePath = "",
                 )
             } catch (error: Exception) {
                 errors += "第 ${index + 1} 条事件解析失败，已跳过：${error.message}"
@@ -275,6 +389,6 @@ object Backup {
             }
         }
 
-        return ImportResult(events, exceptions, errors, settings)
+        return ImportResult(events, exceptions, errors, settings, images, eventImageIds)
     }
 }

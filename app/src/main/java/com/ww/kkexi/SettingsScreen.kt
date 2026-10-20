@@ -1,6 +1,8 @@
 package com.ww.kkexi
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -43,15 +45,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
@@ -797,26 +804,93 @@ private fun DataSettingsPage(
     onLoadSample: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var backupDraft by remember { mutableStateOf("") }
     // 剪贴板为空 / 内容不像备份时的提示。不做成"点了没反应"，那是最难查的体验问题。
     var pasteHint by remember { mutableStateOf("") }
+    // 文件导入/导出的结果提示（与剪贴板提示分开，避免互相覆盖）。
+    var fileHint by remember { mutableStateOf("") }
+    // 文件导出要先拿到字符串再交给系统文件选择器。
+    var pendingExport by remember { mutableStateOf("") }
+    // 大备份不能塞进 OutlinedTextField：几 MB 的 base64 会让 Compose 排版卡死（真机 ANR）。
+    // 所以文件导入时把原文放这里，文本框只用于手改/小备份。
+    var pendingBackupText by remember { mutableStateOf("") }
     // 导入前先给一份「要导入什么」的确认，避免误把旧备份盖上去。
     var pendingImport by remember { mutableStateOf<Backup.ImportResult?>(null) }
+
+    val createBackup = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        it.write(pendingExport.toByteArray(Charsets.UTF_8))
+                    } ?: error("没有拿到输出流")
+                }.isSuccess
+            }
+            fileHint = if (ok) "备份文件已保存（含原图）" else "保存失败，换个位置再试"
+        }
+    }
+
+    val openBackup = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error("没有拿到输入流")
+                }.getOrNull()
+            }
+            if (text.isNullOrBlank()) {
+                fileHint = "读取失败，或文件是空的"
+            } else {
+                // 备份带原图时可能有几 MB；解析（JSON + base64 解码）必须离开主线程，
+                // 否则会 ANR——这是真机上实测到的（「课隙无响应」）。
+                val parsed = withContext(Dispatchers.IO) { Backup.parse(text) }
+                // 不把全文塞进文本框：大备份会让 Compose 排版卡死。
+                backupDraft = ""
+                pendingBackupText = text
+                pendingImport = parsed
+                fileHint = "已读取 ${text.length / 1024} KB（含原图），确认后导入"
+            }
+        }
+    }
 
     FieldLabel("备份（JSON）")
     Spacer(Modifier.height(4.dp))
     Text(
-        "导出后自己保存好。换手机时把它粘回来即可恢复——包括课程、行程、改期记录，" +
-            "以及作息表、类别、外观、提醒提前量这些设置。",
+        "导出后自己保存好。换手机时把它导回来即可恢复——包括课程、行程、改期记录、" +
+            "一手资料的原图，以及作息表、类别、外观、提醒提前量这些设置。" +
+            "原图会以 base64 一起写进 JSON，所以文件会明显变大，建议用「导出到文件」。",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(8.dp))
-    Row {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedButton(onClick = {
+            val text = onExport()
+            pendingExport = text
+            // 大备份不要塞进文本框，也不要硬塞剪贴板（可能超 Binder 限制）。
+            if (text.length <= 200_000) {
+                backupDraft = text
+                fileHint = ""
+                runCatching { clipboard.setText(AnnotatedString(text)) }
+                    .onFailure { fileHint = "复制失败，请改用「导出到文件」" }
+            } else {
+                backupDraft = ""
+                fileHint = "备份约 ${text.length / 1024 / 1024} MB（含原图），已生成；请用「导出到文件」"
+            }
+        }) { Text("复制到剪贴板") }
+        Spacer(Modifier.width(10.dp))
         Button(onClick = {
-            backupDraft = onExport()
-            clipboard.setText(AnnotatedString(backupDraft))
-        }) { Text("导出到剪贴板") }
+            pendingExport = onExport()
+            createBackup.launch("kkexi-backup-${java.time.LocalDate.now()}.json")
+        }) { Text("导出到文件") }
     }
     Spacer(Modifier.height(8.dp))
     OutlinedTextField(
@@ -826,7 +900,11 @@ private fun DataSettingsPage(
         modifier = Modifier.fillMaxWidth().heightIn(min = 110.dp),
     )
     Spacer(Modifier.height(6.dp))
-    Row {
+    Row(Modifier.horizontalScroll(rememberScrollState())) {
+        OutlinedButton(
+            onClick = { openBackup.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
+        ) { Text("从文件导入") }
+        Spacer(Modifier.width(10.dp))
         // 手长按输入框再选「粘贴」在手机上很别扭，给一个按钮。
         OutlinedButton(
             onClick = {
@@ -837,22 +915,48 @@ private fun DataSettingsPage(
                     !text.contains("kkexi-backup") ->
                         pasteHint = "剪贴板里的内容不像备份文件（缺少 kkexi-backup 标记）"
                     else -> {
-                        backupDraft = text
-                        pasteHint = ""
+                        if (text.length > 200_000) {
+                            // 同上：大备份只进内存，不进文本框。
+                            backupDraft = ""
+                            pendingBackupText = text
+                            pasteHint = ""
+                            fileHint = "备份较大（${text.length / 1024} KB），已读取，不显示全文"
+                            scope.launch {
+                                pendingImport = withContext(Dispatchers.IO) { Backup.parse(text) }
+                            }
+                        } else {
+                            backupDraft = text
+                            pendingBackupText = ""
+                            pasteHint = ""
+                            fileHint = ""
+                        }
                     }
                 }
             },
         ) { Text("从剪贴板粘贴") }
         Spacer(Modifier.width(10.dp))
         OutlinedButton(
-            enabled = backupDraft.isNotBlank(),
+            enabled = backupDraft.isNotBlank() || pendingBackupText.isNotBlank(),
             onClick = {
-                pendingImport = Backup.parse(backupDraft)
-                pasteHint = ""
+                val source = pendingBackupText.ifEmpty { backupDraft }
+                scope.launch {
+                    // 同 openBackup：含原图的备份可能有几 MB，解析不能放主线程。
+                    pendingImport = withContext(Dispatchers.IO) { Backup.parse(source) }
+                    pasteHint = ""
+                }
             },
         ) { Text("导入") }
         Spacer(Modifier.width(10.dp))
-        TextButton(onClick = { backupDraft = onExport() }) { Text("只生成不复制") }
+        TextButton(onClick = {
+            val text = onExport()
+            pendingExport = text
+            if (text.length <= 200_000) {
+                backupDraft = text
+            } else {
+                backupDraft = ""
+                fileHint = "备份约 ${text.length / 1024 / 1024} MB（含原图），已生成；请用「导出到文件」"
+            }
+        }) { Text("只生成不复制") }
     }
     if (pasteHint.isNotEmpty()) {
         Spacer(Modifier.height(4.dp))
@@ -862,12 +966,23 @@ private fun DataSettingsPage(
             color = MaterialTheme.colorScheme.error,
         )
     }
+    if (fileHint.isNotEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            fileHint,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
 
     val confirm = pendingImport
     if (confirm != null) {
         val hasSettings = !confirm.settings.isEmpty
         AlertDialog(
-            onDismissRequest = { pendingImport = null },
+            onDismissRequest = {
+                pendingImport = null
+                pendingBackupText = ""
+            },
             title = { Text("确认导入") },
             text = {
                 Column {
@@ -876,6 +991,14 @@ private fun DataSettingsPage(
                             if (confirm.exceptions.isEmpty()) "" else "、${confirm.exceptions.size} 条改期记录",
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    if (confirm.images.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "含 ${confirm.images.size} 张一手资料原图（会写回本机，日程可继续查看原图）。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     if (hasSettings) {
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -902,12 +1025,17 @@ private fun DataSettingsPage(
             },
             confirmButton = {
                 Button(onClick = {
-                    onImport(backupDraft)
+                    onImport(pendingBackupText.ifEmpty { backupDraft })
                     pendingImport = null
+                    pendingBackupText = ""
+                    backupDraft = ""
                 }) { Text("确认导入") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingImport = null }) { Text("取消") }
+                TextButton(onClick = {
+                    pendingImport = null
+                    pendingBackupText = ""
+                }) { Text("取消") }
             },
         )
     }

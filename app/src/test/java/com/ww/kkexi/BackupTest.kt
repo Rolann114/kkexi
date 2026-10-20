@@ -6,6 +6,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -50,11 +51,11 @@ class BackupTest {
     )
 
     @Test
-    fun format_version_is_2() {
+    fun format_version_is_3() {
         // v1：只有日程 + 改期记录。
-        // v2：多了 settings（自定义作息表/类别/外观/提醒提前量）——
-        //     换手机时这些也得跟着走，否则要重配一遍，而用户未必记得自己改过哪一节。
-        assertEquals(2, Backup.FORMAT_VERSION)
+        // v2：多了 settings（自定义作息表/类别/外观/提醒提前量）。
+        // v3：多了 sourceText 与 images（一手资料原图），换手机不再丢「一手资料」。
+        assertEquals(3, Backup.FORMAT_VERSION)
     }
 
     @Test
@@ -313,5 +314,57 @@ class BackupTest {
         assertNull("空串地点往返后变成 null", parsed.exceptions[0].movedLocation)
         assertEquals(LocalDate.of(2026, 10, 15), parsed.exceptions[0].movedToDate)
         assertEquals(SessionState.MOVED, parsed.exceptions[0].state)
+    }
+
+    // ---------- v3：一手资料（原文 + 原图） ----------
+
+    @Test
+    fun source_text_round_trips() {
+        val event = SeedData.events.first().copy(sourceText = "原文：线性代数 教师：示例教师 周次：5-16周")
+        val parsed = Backup.parse(Backup.export(listOf(event), emptyList()))
+
+        assertEquals("原文：线性代数 教师：示例教师 周次：5-16周", parsed.events.single().sourceText)
+    }
+
+    @Test
+    fun source_image_is_embedded_once_and_round_trips() {
+        val file = File.createTempFile("kkexi-img-", ".jpg")
+        try {
+            val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3, 4, 5)
+            file.writeBytes(bytes)
+            val base = SeedData.events.first().copy(sourceImagePath = file.absolutePath)
+            // 一张课表截图会对应多条候选；同一路径必须只内嵌一份。
+            val events = listOf(base, base.copy(id = "dup-2"))
+
+            val json = Backup.export(events, emptyList())
+            val root = JSONObject(json)
+            assertEquals("同一张图只内嵌一份", 1, root.getJSONArray("images").length())
+
+            val parsed = Backup.parse(json)
+            assertEquals(1, parsed.images.size)
+            assertEquals(2, parsed.eventImageIds.size)
+            assertTrue(parsed.images.values.single().bytes.contentEquals(bytes))
+            assertEquals(2, parsed.events.size)
+            assertEquals("事件本身不保留本机路径", "", parsed.events[0].sourceImagePath)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun v2_backup_without_source_fields_still_parses() {
+        val json = """
+            {"format":"kkexi-backup","formatVersion":2,"events":[
+              {"id":"x","title":"旧备份","kind":"ACTIVITY","anchorDate":"2026-10-19",
+               "timeMode":"CLOCK","startMinute":600,"endMinute":660}
+            ]}
+        """.trimIndent()
+
+        val parsed = Backup.parse(json)
+
+        assertEquals(1, parsed.events.size)
+        assertEquals("", parsed.events.first().sourceText)
+        assertTrue("老备份没有 images 数组", parsed.images.isEmpty())
+        assertTrue(parsed.eventImageIds.isEmpty())
     }
 }

@@ -31,8 +31,26 @@
 | AI 解析（可选） | 文字或课表截图 → 候选卡片 → 逐条修改 → 确认入库 |
 | 一手资料 | 点开日程可回看当时喂给 AI 的原文/原图；原图支持全屏缩放 |
 | 搜索 | 按标题、地点、描述、教师搜整个学期 |
-| 备份 | 导出/导入 JSON，连作息表、类别、外观设置一起带走 |
+| 备份 | 导出/导入 JSON，**一手资料原图也会一起打包**；连作息表、类别、外观设置一起带走 |
 | 外观 | 跟随系统 / 浅色 / 深色；Android 12+ 可选动态取色 |
+
+## 界面
+
+> 截图使用内置的虚构示例数据（示例教师甲/乙、A101/B203 等），不含真实课表。
+
+<p align="center">
+  <img src="docs/screenshots/timeline.png" width="300" alt="时间轴">
+  <img src="docs/screenshots/timetable.png" width="300" alt="课程表">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/new-event.png" width="300" alt="新建行程">
+  <img src="docs/screenshots/course-repeat.png" width="300" alt="整学期课程">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/appearance.png" width="300" alt="外观">
+</p>
 
 ## 隐私
 
