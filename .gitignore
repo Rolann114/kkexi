@@ -1,0 +1,65 @@
+# Android / Gradle 构建产物
+.gradle/
+build/
+app/build/
+captures/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# 本地环境（不进版本库：路径与签名口令因人而异）
+local.properties
+keystore.properties
+
+# 工作区内的一次性工具链与缓存（体积大，可随时重建，见 _tools/setup-*.py）
+_sdk/
+_gradle/
+_gradle_home/
+_jdk/
+
+# ============================================================================
+# 个人数据：**这些绝不能进版本库**
+#
+# 这个 App 是要分享 / 开源的，所以任何来自真实使用的数据都必须留在本机：
+#   - _ref/           官方作息表与校历 PDF、来源索引（指向具体学校）
+#   - _shots/         真机测试截图（界面里带着真实课表）
+#   - seed-*.json     从真实数据库导出的示例备份
+#   - seed-*.sql      同一份数据的 SQL 版本
+#   - _*.db           从设备拉下来排查问题用的数据库副本
+#
+# 发布前请跑 python _tools/privacy-audit.py，它会逐项确认这些都被排除了。
+# ============================================================================
+_ref/
+_shots/
+seed-backup.json
+seed-import.sql
+seed-export.json
+_*.db
+
+# 开发脚本的临时产物
+_tools/_*.txt
+_dump-*.txt
+
+# ============================================================================
+# 本机工作材料：含绝对路径、设备信息或个人数据，**不进公开仓库**
+# ============================================================================
+AGENTS.md
+PROJECT_STATE.md
+.dsh-write-probe.txt
+_p3.txt
+keystore/
+上传文件/
+_demo-build/
+
+# 编辑器
+.idea/
+*.iml
+.vscode/
+.kotlin/
+
+# 操作系统
+Thumbs.db
+desktop.ini
+.DS_Store

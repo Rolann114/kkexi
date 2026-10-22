@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  应用图标前景：一个日历，里面三行「安排」，第二行中间留一道缝。
+
+  为什么是这道缝：App 叫「课隙」——课与课之间的空隙。
+  三行色块代表一天的安排，中间那一行断开，就是「隙」。
+  这样图标不只说「这是个日历」（那太普通），还说出了它自己的名字。
+
+  画布是 108×108，系统会把外围裁掉，**有效区域是中间 72×72**（18..90）。
+  下面所有形状都落在 20..88 之间，所以任何形状的遮罩（圆形/方形/水滴）都不会切到内容。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 顶部两个「挂环」 -->
+    <path
+        android:pathData="M34,21h4v11h-4z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M70,21h4v11h-4z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 日历外框（描边，圆角 10）
+         描边宽度取 4 而不是 4.5：外框在 20..88，描边各向两侧扩 2，
+         于是最外沿正好是 18..90，刚好不越出 72dp 安全区。 -->
+    <path
+        android:pathData="M30,28 h48 a10,10 0 0 1 10,10 v40 a10,10 0 0 1 -10,10 h-48 a10,10 0 0 1 -10,-10 v-40 a10,10 0 0 1 10,-10 z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- 表头分隔线 -->
+    <path
+        android:pathData="M21,44 h66"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5" />
+
+    <!-- 第一行安排（满宽） -->
+    <path
+        android:pathData="M34.5,51 h39 a2.5,2.5 0 0 1 2.5,2.5 v1 a2.5,2.5 0 0 1 -2.5,2.5 h-39 a2.5,2.5 0 0 1 -2.5,-2.5 v-1 a2.5,2.5 0 0 1 2.5,-2.5 z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 第二行安排：故意断成两截，中间就是「隙」 -->
+    <path
+        android:pathData="M34.5,63 h13 a2.5,2.5 0 0 1 2.5,2.5 v1 a2.5,2.5 0 0 1 -2.5,2.5 h-13 a2.5,2.5 0 0 1 -2.5,-2.5 v-1 a2.5,2.5 0 0 1 2.5,-2.5 z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M60.5,63 h13 a2.5,2.5 0 0 1 2.5,2.5 v1 a2.5,2.5 0 0 1 -2.5,2.5 h-13 a2.5,2.5 0 0 1 -2.5,-2.5 v-1 a2.5,2.5 0 0 1 2.5,-2.5 z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 第三行安排（短一些） -->
+    <path
+        android:pathData="M34.5,75 h27 a2.5,2.5 0 0 1 2.5,2.5 v1 a2.5,2.5 0 0 1 -2.5,2.5 h-27 a2.5,2.5 0 0 1 -2.5,-2.5 v-1 a2.5,2.5 0 0 1 2.5,-2.5 z"
+        android:fillColor="#FFFFFF" />
+</vector>

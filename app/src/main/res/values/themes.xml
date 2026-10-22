@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      只用平台自带的 Material 主题，不引入 com.google.android.material 依赖
+      （AGENTS.md 硬约束 7「依赖克制」）。真正的配色由 Compose 的 KkexiTheme 管。
+
+      这里只负责三件 Compose 管不到的事：
+      1. 冷启动时窗口的底色（否则深色模式会闪一下白）；
+      2. 系统栏透明，让内容真正铺到屏幕边缘（配合 MainActivity 的 enableEdgeToEdge）；
+      3. 状态栏/导航栏图标的明暗（浅色模式要深色图标）。
+    -->
+    <style name="Theme.Kkexi" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>
