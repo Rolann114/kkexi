@@ -328,7 +328,9 @@ class BackupTest {
 
     @Test
     fun source_image_is_embedded_once_and_round_trips() {
-        val file = File.createTempFile("kkexi-img-", ".jpg")
+        // 不用系统临时目录：部分机器的 java.io.tmpdir 无写权限（实测 IOException: 拒绝访问）。
+        val tmpDir = File("build/tmp/backup-test").apply { mkdirs() }
+        val file = File.createTempFile("kkexi-img-", ".jpg", tmpDir)
         try {
             val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3, 4, 5)
             file.writeBytes(bytes)
