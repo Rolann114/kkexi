@@ -74,6 +74,13 @@ Android 8.0+。从 [Releases](https://github.com/Rolann114/kkexi/releases) 下�
 </tr>
 </table>
 
+<details>
+<summary>展开完整 AI 长截图（1080×8437）</summary>
+<p align="center">
+  <img src="docs/screenshots/ai-chat-full.jpg" width="320" alt="完整 AI 对话长截图">
+</p>
+</details>
+
 <p align="center">
   <img src="docs/screenshots/settings.jpg" width="300" alt="设置">
 </p>
